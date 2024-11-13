@@ -62,8 +62,8 @@ private:
   size_t findFreeSpace(size_t size) {
     std::vector<std::pair<size_t, size_t>> usedRanges;
 
-    for (const auto &file : fileTable) {
-      if (!file.isDirectory && file.size > 0) {
+    for (const auto &file: fileTable) {
+      if (! file.isDirectory && file.size > 0) {
         usedRanges.push_back({file.offset, file.offset + file.size});
       }
     }
@@ -71,7 +71,7 @@ private:
     std::sort(usedRanges.begin(), usedRanges.end());
 
     size_t current = dataStart;
-    for (const auto &range : usedRanges) {
+    for (const auto &range: usedRanges) {
       if (range.first - current >= size) {
         return current;
       }
@@ -180,7 +180,7 @@ private:
     iss >> value >> unit;
 
     // Convert to uppercase for comparison
-    for (char &c : unit) {
+    for (char &c: unit) {
       c = toupper(c);
     }
 
@@ -205,7 +205,7 @@ private:
     if (command == "help") {
       displayHelp();
     } else if (command == "env") {
-      for (const auto &pair : envVars) {
+      for (const auto &pair: envVars) {
         std::cout << pair.first << "=" << pair.second << std::endl;
       }
     } else if (command == "peek") {
@@ -307,7 +307,7 @@ private:
       std::getline(iss >> std::ws, content);
 
       size_t fileIndex = findFile(name, currentDir);
-      if (fileIndex != SIZE_MAX && !fileTable[fileIndex].isDirectory) {
+      if (fileIndex != SIZE_MAX && ! fileTable[fileIndex].isDirectory) {
         size_t offset = findFreeSpace(content.length());
         if (offset != SIZE_MAX) {
           std::copy(content.begin(), content.end(), memory.get() + offset);
@@ -325,7 +325,7 @@ private:
       iss >> name;
 
       size_t fileIndex = findFile(name, currentDir);
-      if (fileIndex != SIZE_MAX && !fileTable[fileIndex].isDirectory) {
+      if (fileIndex != SIZE_MAX && ! fileTable[fileIndex].isDirectory) {
         if (fileTable[fileIndex].size > 0) {
           std::cout.write(reinterpret_cast<char *>(memory.get() +
                                                    fileTable[fileIndex].offset),
@@ -341,13 +341,13 @@ private:
 
       size_t fileIndex = findFile(name, currentDir);
       if (fileIndex != SIZE_MAX) {
-        if (!fileTable[fileIndex].isDirectory) {
+        if (! fileTable[fileIndex].isDirectory) {
           fileTable.erase(fileTable.begin() + fileIndex);
           std::cout << "File removed\n";
         } else {
           // Check if directory is empty
           bool isEmpty = true;
-          for (const auto &entry : fileTable) {
+          for (const auto &entry: fileTable) {
             if (entry.parent == fileIndex) {
               isEmpty = false;
               break;
@@ -365,8 +365,8 @@ private:
       }
     } else if (command == "df") {
       size_t usedSpace = 0;
-      for (const auto &file : fileTable) {
-        if (!file.isDirectory) {
+      for (const auto &file: fileTable) {
+        if (! file.isDirectory) {
           usedSpace += file.size;
         }
       }
@@ -385,7 +385,7 @@ private:
 public:
   MemoryConsole(size_t initialSize = 2ULL * 1024 * 1024 * 1024)
       : running(true), currentPosition(0), memorySize(0) {
-    if (!reallocateMemory(initialSize)) {
+    if (! reallocateMemory(initialSize)) {
       throw std::runtime_error("Failed to allocate initial memory");
     }
     loadEnvironmentVariables();
@@ -401,7 +401,7 @@ public:
     while (running) {
       std::cout << "\nmc> ";
       std::getline(std::cin, cmdLine);
-      if (!cmdLine.empty()) {
+      if (! cmdLine.empty()) {
         executeCommand(cmdLine);
       }
     }
