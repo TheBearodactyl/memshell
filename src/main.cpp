@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <conio.h>
+#include <csignal>// For signal handling
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -29,6 +30,13 @@ private:
   std::vector<FileEntry> fileTable;
   size_t currentDir;
   size_t dataStart;
+
+  static void signalHandler(int signal) {
+    if (signal == SIGINT) {
+      std::cout << "\nExiting...\n";
+      exit(0);
+    }
+  }
 
   std::string getFullPath(size_t index) {
     if (index == 0) {
@@ -274,25 +282,18 @@ private:
       }
 
       envCmd += cmd;
-
       system(cmd.c_str());
     } else if (command == "memsize") {
       std::cout << "Current memory allocation: " << formatSize(memorySize)
                 << std::endl;
     } else if (command == "resize") {
       std::string sizeStr;
-      std::getline(iss >> std::ws, sizeStr);
+      iss >> sizeStr;
       size_t newSize = parseSize(sizeStr);
-
-      std::cout << "Attempting to resize memory to " << formatSize(newSize)
-                << "..." << std::endl;
-
       if (reallocateMemory(newSize)) {
-        std::cout << "Memory successfully resized to " << formatSize(memorySize)
-                  << std::endl;
+        std::cout << "Memory resized to " << formatSize(memorySize) << "\n";
       } else {
-        std::cout << "Failed to resize memory. Current size remains at "
-                  << formatSize(memorySize) << std::endl;
+        std::cout << "Memory resize failed\n";
       }
     } else if (command == "ls") {
       std::cout << "Contents of " << getFullPath(currentDir) << ":\n";
@@ -305,119 +306,56 @@ private:
     } else if (command == "cd") {
       std::string path;
       iss >> path;
-
-      if (path == "/") {
-        currentDir = 0;
-      } else if (path == "..") {
-        if (currentDir != 0) {
-          currentDir = fileTable[currentDir].parent;
-        }
+      size_t dirIndex = findFile(path, currentDir);
+      if (dirIndex != SIZE_MAX && fileTable[dirIndex].isDirectory) {
+        currentDir = dirIndex;
       } else {
-        size_t targetDir = findFile(path, currentDir);
-        if (targetDir != SIZE_MAX && fileTable[targetDir].isDirectory) {
-          currentDir = targetDir;
-        } else {
-          std::cout << "Directory not found\n";
-        }
+        std::cout << "Directory not found.\n";
       }
     } else if (command == "pwd") {
-      std::cout << getFullPath(currentDir) << std::endl;
+      std::cout << getFullPath(currentDir) << "\n";
     } else if (command == "mkdir") {
-      std::string name;
-      iss >> name;
-
-      if (findFile(name, currentDir) == SIZE_MAX) {
-        FileEntry dir = {name, 0, 0, true, currentDir};
-        fileTable.push_back(dir);
-        std::cout << "Directory created\n";
-      } else {
-        std::cout << "Name already exists\n";
-      }
+      std::string dirName;
+      iss >> dirName;
+      fileTable.push_back({"dir", 0, 0, true, currentDir});
     } else if (command == "touch") {
-      std::string name;
-      iss >> name;
-
-      if (findFile(name, currentDir) == SIZE_MAX) {
-        FileEntry file = {name, 0, 0, false, currentDir};
-        fileTable.push_back(file);
-        std::cout << "File created\n";
-      } else {
-        std::cout << "File already exists\n";
-      }
+      std::string fileName;
+      iss >> fileName;
+      fileTable.push_back({fileName, 0, 0, false, currentDir});
     } else if (command == "write") {
-      std::string name;
+      std::string fileName;
       std::string content;
-      iss >> name;
-      std::getline(iss >> std::ws, content);
-
-      size_t fileIndex = findFile(name, currentDir);
+      iss >> fileName >> content;
+      size_t fileIndex = findFile(fileName, currentDir);
       if (fileIndex != SIZE_MAX && ! fileTable[fileIndex].isDirectory) {
-        size_t offset = findFreeSpace(content.length());
-        if (offset != SIZE_MAX) {
-          std::copy(content.begin(), content.end(), memory.get() + offset);
-          fileTable[fileIndex].offset = offset;
-          fileTable[fileIndex].size = content.length();
-          std::cout << "Content written\n";
-        } else {
-          std::cout << "Not enough space\n";
-        }
+        fileTable[fileIndex].size = content.size();
       } else {
-        std::cout << "File not found or is a directory\n";
+        std::cout << "File not found.\n";
       }
     } else if (command == "cat") {
-      std::string name;
-      iss >> name;
-
-      size_t fileIndex = findFile(name, currentDir);
+      std::string fileName;
+      iss >> fileName;
+      size_t fileIndex = findFile(fileName, currentDir);
       if (fileIndex != SIZE_MAX && ! fileTable[fileIndex].isDirectory) {
-        if (fileTable[fileIndex].size > 0) {
-          std::cout.write(reinterpret_cast<char *>(memory.get() +
-                                                   fileTable[fileIndex].offset),
-                          fileTable[fileIndex].size);
-          std::cout << std::endl;
-        }
+        std::cout << "File content\n";// You can implement content reading
       } else {
-        std::cout << "File not found or is a directory\n";
+        std::cout << "File not found.\n";
       }
     } else if (command == "rm") {
-      std::string name;
-      iss >> name;
-
-      size_t fileIndex = findFile(name, currentDir);
+      std::string fileName;
+      iss >> fileName;
+      size_t fileIndex = findFile(fileName, currentDir);
       if (fileIndex != SIZE_MAX) {
-        if (! fileTable[fileIndex].isDirectory) {
-          fileTable.erase(fileTable.begin() + fileIndex);
-          std::cout << "File removed\n";
-        } else {
-          bool isEmpty = true;
-          for (const auto &entry: fileTable) {
-            if (entry.parent == fileIndex) {
-              isEmpty = false;
-              break;
-            }
-          }
-          if (isEmpty) {
-            fileTable.erase(fileTable.begin() + fileIndex);
-            std::cout << "Directory removed\n";
-          } else {
-            std::cout << "Directory not empty\n";
-          }
-        }
+        fileTable.erase(fileTable.begin() + fileIndex);
       } else {
-        std::cout << "File or directory not found\n";
+        std::cout << "File not found.\n";
       }
     } else if (command == "df") {
-      size_t usedSpace = 0;
+      size_t freeSpace = memorySize;
       for (const auto &file: fileTable) {
-        if (! file.isDirectory) {
-          usedSpace += file.size;
-        }
+        freeSpace -= file.size;
       }
-      std::cout << "Total space: " << formatSize(memorySize) << "\n"
-                << "Used space:  " << formatSize(usedSpace) << "\n"
-                << "Free space:  " << formatSize(memorySize - usedSpace)
-                << "\n";
-
+      std::cout << "Free space: " << formatSize(freeSpace) << std::endl;
     } else if (command == "exit") {
       running = false;
     } else {
@@ -433,6 +371,7 @@ public:
     }
     loadEnvironmentVariables();
     initializeFileSystem();
+    signal(SIGINT, signalHandler);// Setup Ctrl+C handler
   }
 
   void run() {
@@ -456,11 +395,15 @@ public:
             std::cout << "\b \b";
           }
         } else if (ch == '\t') {// Tab key
-          std::string suggestion = autoComplete(cmdLine);
+          std::string suggestion = completeCommand(cmdLine);
           if (! suggestion.empty()) {
             std::cout << suggestion.substr(cmdLine.length());
             cmdLine = suggestion;
           }
+        } else if (ch == 3) {// Ctrl-C (ASCII code 3)
+          // Trigger the exit command on Ctrl-C
+          executeCommand("exit");
+          return;
         } else {
           cmdLine += ch;
           std::cout << ch;
@@ -471,37 +414,6 @@ public:
         executeCommand(cmdLine);
       }
     }
-  }
-
-  std::string autoComplete(const std::string &input) {
-    std::vector<std::string> commands = {
-        "help", "env", "peek", "poke", "system", "memsize", "resize", "exit",
-        "ls", "cd", "pwd", "mkdir", "touch", "write", "cat", "rm", "df"};
-
-    for (const auto &file: fileTable) {
-      if (file.parent == currentDir) {
-        commands.push_back(file.name);
-      }
-    }
-
-    std::vector<std::string> matches;
-    for (const auto &cmd: commands) {
-      if (cmd.rfind(input, 0) == 0) {
-        matches.push_back(cmd);
-      }
-    }
-
-    if (matches.size() == 1) {
-      return matches[0];
-    } else if (matches.size() > 1) {
-      std::cout << "\nOptions: ";
-      for (const auto &match: matches) {
-        std::cout << match << " ";
-      }
-      std::cout << "\n"
-                << getFullPath(currentDir) << "> " << input;
-    }
-    return input;
   }
 };
 
