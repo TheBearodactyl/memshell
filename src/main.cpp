@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <conio.h>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -261,6 +262,19 @@ private:
     } else if (command == "system") {
       std::string cmd;
       std::getline(iss >> std::ws, cmd);
+
+      if (cmd.empty()) {
+        std::cout << "No command provided for system execution.\n";
+        return;
+      }
+
+      std::string envCmd;
+      for (const auto &envVar: envVars) {
+        envCmd += envVar.first + "=" + envVar.second + " ";
+      }
+
+      envCmd += cmd;
+
       system(cmd.c_str());
     } else if (command == "memsize") {
       std::cout << "Current memory allocation: " << formatSize(memorySize)
@@ -422,24 +436,72 @@ public:
   }
 
   void run() {
-    std::cout << "Memory Console (Initially allocated: "
-              << formatSize(memorySize) << ")\n"
+    std::cout << "Memory Console (Initially allocated: " << formatSize(memorySize) << ")\n"
               << "Type 'help' for available commands\n";
 
     std::string cmdLine;
     while (running) {
       std::cout << getFullPath(currentDir) << "> ";
-      std::getline(std::cin, cmdLine);
+      cmdLine.clear();
 
-      if (! cmdLine.empty() && cmdLine.back() == '\t') {
-        cmdLine.pop_back();                                             
-        cmdLine = completeCommand(cmdLine);                             
-        std::cout << "\r" << getFullPath(currentDir) << "> " << cmdLine;
-        std::cout.flush();
-      } else if (! cmdLine.empty()) {
+      while (true) {
+        // Capture each character input from user
+        char ch = _getch();// Use _getch() to get raw input
+        if (ch == '\r') {  // Enter key
+          std::cout << std::endl;
+          break;
+        } else if (ch == '\b') {// Backspace
+          if (! cmdLine.empty()) {
+            cmdLine.pop_back();
+            std::cout << "\b \b";
+          }
+        } else if (ch == '\t') {// Tab key
+          std::string suggestion = autoComplete(cmdLine);
+          if (! suggestion.empty()) {
+            std::cout << suggestion.substr(cmdLine.length());
+            cmdLine = suggestion;
+          }
+        } else {
+          cmdLine += ch;
+          std::cout << ch;
+        }
+      }
+
+      if (! cmdLine.empty()) {
         executeCommand(cmdLine);
       }
     }
+  }
+
+  std::string autoComplete(const std::string &input) {
+    std::vector<std::string> commands = {
+        "help", "env", "peek", "poke", "system", "memsize", "resize", "exit",
+        "ls", "cd", "pwd", "mkdir", "touch", "write", "cat", "rm", "df"};
+
+    for (const auto &file: fileTable) {
+      if (file.parent == currentDir) {
+        commands.push_back(file.name);
+      }
+    }
+
+    std::vector<std::string> matches;
+    for (const auto &cmd: commands) {
+      if (cmd.rfind(input, 0) == 0) {
+        matches.push_back(cmd);
+      }
+    }
+
+    if (matches.size() == 1) {
+      return matches[0];
+    } else if (matches.size() > 1) {
+      std::cout << "\nOptions: ";
+      for (const auto &match: matches) {
+        std::cout << match << " ";
+      }
+      std::cout << "\n"
+                << getFullPath(currentDir) << "> " << input;
+    }
+    return input;
   }
 };
 
