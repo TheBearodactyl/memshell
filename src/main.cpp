@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <conio.h>
-#include <csignal>// For signal handling
+#include <csignal>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -337,7 +337,7 @@ private:
       iss >> fileName;
       size_t fileIndex = findFile(fileName, currentDir);
       if (fileIndex != SIZE_MAX && ! fileTable[fileIndex].isDirectory) {
-        std::cout << "File content\n";// You can implement content reading
+        std::cout << "File content\n";
       } else {
         std::cout << "File not found.\n";
       }
@@ -371,7 +371,7 @@ public:
     }
     loadEnvironmentVariables();
     initializeFileSystem();
-    signal(SIGINT, signalHandler);// Setup Ctrl+C handler
+    signal(SIGINT, signalHandler);
   }
 
   void run() {
@@ -384,24 +384,22 @@ public:
       cmdLine.clear();
 
       while (true) {
-        // Capture each character input from user
-        char ch = _getch();// Use _getch() to get raw input
-        if (ch == '\r') {  // Enter key
+        char ch = _getch();
+        if (ch == '\r') {  
           std::cout << std::endl;
           break;
-        } else if (ch == '\b') {// Backspace
+        } else if (ch == '\b') {
           if (! cmdLine.empty()) {
             cmdLine.pop_back();
             std::cout << "\b \b";
           }
-        } else if (ch == '\t') {// Tab key
+        } else if (ch == '\t') {
           std::string suggestion = completeCommand(cmdLine);
           if (! suggestion.empty()) {
             std::cout << suggestion.substr(cmdLine.length());
             cmdLine = suggestion;
           }
-        } else if (ch == 3) {// Ctrl-C (ASCII code 3)
-          // Trigger the exit command on Ctrl-C
+        } else if (ch == 3) {
           executeCommand("exit");
           return;
         } else {
