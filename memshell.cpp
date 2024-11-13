@@ -29,19 +29,10 @@ private:
   size_t currentDir;
   size_t dataStart;
 
-  void initializeFileSystem() {
-    fileTable.clear();
-
-    FileEntry root = {"", 0, 0, true, 0};
-    fileTable.push_back(root);
-
-    currentDir = 0;
-    dataStart = 1024 * 1024;
-  }
-
   std::string getFullPath(size_t index) {
-    if (index == 0)
+    if (index == 0) {
       return "/";
+    }
 
     std::vector<std::string> parts;
     size_t current = index;
@@ -57,6 +48,46 @@ private:
     }
 
     return result.empty() ? "/" : result;
+  }
+
+  void initializeFileSystem() {
+    fileTable.clear();
+
+    FileEntry root = {"", 0, 0, true, 0};
+    fileTable.push_back(root);
+
+    currentDir = 0;
+    dataStart = 1024 * 1024;
+  }
+
+  std::string completeCommand(const std::string &partial) {
+    static const std::vector<std::string> commands = {
+        "help", "env", "peek", "poke", "system", "memsize", "resize", "exit",
+        "ls", "cd", "pwd", "mkdir", "touch", "write", "cat", "rm", "df"};
+
+    std::vector<std::string> matches;
+    for (const auto &command: commands) {
+      if (command.find(partial) == 0) {
+        matches.push_back(command);
+      }
+    }
+
+    for (const auto &entry: fileTable) {
+      if (entry.parent == currentDir && entry.name.find(partial) == 0) {
+        matches.push_back(entry.name);
+      }
+    }
+
+    if (matches.size() == 1) {
+      return matches[0];
+    } else if (matches.size() > 1) {
+      std::cout << "\n";
+      for (const auto &match: matches) {
+        std::cout << match << " ";
+      }
+      std::cout << "\n";
+    }
+    return partial;
   }
 
   size_t findFreeSpace(size_t size) {
@@ -179,7 +210,6 @@ private:
     std::string unit;
     iss >> value >> unit;
 
-    // Convert to uppercase for comparison
     for (char &c: unit) {
       c = toupper(c);
     }
@@ -345,7 +375,6 @@ private:
           fileTable.erase(fileTable.begin() + fileIndex);
           std::cout << "File removed\n";
         } else {
-          // Check if directory is empty
           bool isEmpty = true;
           for (const auto &entry: fileTable) {
             if (entry.parent == fileIndex) {
@@ -399,9 +428,15 @@ public:
 
     std::string cmdLine;
     while (running) {
-      std::cout << "\nmc> ";
+      std::cout << getFullPath(currentDir) << "> ";
       std::getline(std::cin, cmdLine);
-      if (! cmdLine.empty()) {
+
+      if (! cmdLine.empty() && cmdLine.back() == '\t') {
+        cmdLine.pop_back();                                             
+        cmdLine = completeCommand(cmdLine);                             
+        std::cout << "\r" << getFullPath(currentDir) << "> " << cmdLine;
+        std::cout.flush();
+      } else if (! cmdLine.empty()) {
         executeCommand(cmdLine);
       }
     }
